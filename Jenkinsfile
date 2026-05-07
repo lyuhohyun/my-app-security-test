@@ -35,7 +35,7 @@ pipeline {
         stage('Step 4: Risk Engine Analysis') {
             steps {
                 echo '🧠 리스크 엔진 가동: 취약점 분석 및 최종 점수 산출 중...'
-                sh "python3 ${ENGINE_SCRIPT}"
+                sh "/usr/bin/python3 ${ENGINE_SCRIPT}"
             }
         }
     }
