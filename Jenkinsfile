@@ -38,13 +38,15 @@ pipeline {
 
         stage('Step 4: Risk Engine Analysis') {
             steps {
-                echo '🧠 리스크 엔진 분석 시작...'
+                echo '🧠 파이썬이 없어서 직접 다운로드하여 리스크 엔진을 가동합니다...'
                 sh '''
-                if command -v python3 &>/dev/null; then
-                    python3 ${ENGINE_SCRIPT}
-                else
-                    python ${ENGINE_SCRIPT}
-                fi
+                echo "1. 휴대용 파이썬(Miniconda) 배달 중... (약 10~20초 소요)"
+                curl -sL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh
+                bash miniconda.sh -b -p ./local_python
+                
+                echo "2. 리스크 엔진 파이썬 스크립트 가동!"
+                # 방금 다운받은 파이썬으로 엔진을 실행합니다.
+                ./local_python/bin/python risk_engine.py
                 '''
             }
         }
