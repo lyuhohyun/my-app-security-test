@@ -11,46 +11,54 @@ pipeline {
     stages {
         stage('Step 1: Checkout') {
             steps {
-                echo '📥 GitHub에서 최신 소스 코드를 가져오는 중...'
+                echo '📥 GitHub에서 소스 코드를 가져오는 중...'
                 checkout scm
             }
         }
 
         stage('Step 2: AST Scan (Semgrep)') {
             steps {
-                echo '🔍 Semgrep을 이용한 소스 코드 보안 스캔 시작...'
-                // 공용 폴더에 만든 바로가기 경로를 사용합니다.
-                sh "/usr/local/bin/semgrep scan --config auto --json --output ${SAST_REPORT} . || true"
+                echo '🔍 Semgrep 스캔...'
+                sh "semgrep scan --config auto --json --output ${SAST_REPORT} . || true"
             }
         }
 
         stage('Step 3: OSS Scan (Trivy)') {
             steps {
-                echo '📦 Trivy를 이용한 오픈소스 취약점 및 SBOM 스캔 시작...'
-                sh "/usr/bin/trivy fs --format json --output ${TRIVY_REPORT} ."
-                sh "/usr/bin/trivy fs --format cyclonedx --output ${SBOM_REPORT} ."
+                echo '📦 Trivy 포터블 버전 다운로드 및 독립 스캔 시작...'
+                // [가장 확실한 해결책] 젠킨스 내부로 Trivy를 즉시 다운받아 실행합니다!
+                sh '''
+                curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .
+                ./trivy fs --format json --output ${TRIVY_REPORT} .
+                ./trivy fs --format cyclonedx --output ${SBOM_REPORT} .
+                '''
             }
         }
 
         stage('Step 4: Risk Engine Analysis') {
             steps {
-                echo '🧠 리스크 엔진 가동: 취약점 분석 및 최종 점수 산출 중...'
-                sh "/usr/bin/python3 ${ENGINE_SCRIPT}"
+                echo '🧠 리스크 엔진 분석 시작...'
+                // 파이썬 실행 명령어도 젠킨스 환경에 맞춰 유연하게 처리합니다.
+                sh '''
+                if command -v python3 &>/dev/null; then
+                    python3 ${ENGINE_SCRIPT}
+                else
+                    python ${ENGINE_SCRIPT}
+                fi
+                '''
             }
         }
     }
 
     post {
         always {
-            echo '📊 스캔 결과 리포트를 저장하는 중...'
             archiveArtifacts artifacts: '*.json', allowEmptyArchive: true, fingerprint: true
         }
         success {
-            echo '✅ [PASS] 모든 보안 기준을 통과했습니다. 배포 단계로 진행이 가능합니다.'
+            echo '✅ [PASS] 모든 보안 기준을 통과했습니다!'
         }
         failure {
-            echo '🚨 [FAIL] 보안 리스크 점수가 기준(8.0)을 초과했거나 시스템 에러가 발생했습니다.'
-            echo '상세 내용은 위 로그와 저장된 JSON 리포트를 확인하세요.'
+            echo '🚨 [FAIL] 보안 리스크 점수 초과 또는 에러 발생!'
         }
     }
 }
